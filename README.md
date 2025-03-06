@@ -1,8 +1,10 @@
 # Error handling proposal
 
-This repository contains pre-work for a Go error handling proposal inspired by Go discussion [#71460][discussion]. With pre-work, I mean that it's not a formal Go proposal _yet_.
+**This is not a formal go proposal yet, but the pre-work needed in order to potentially create one.**
 
-It propose a similar syntax, but different semantics. The semantics is similar to the [try-catch][try-catch] proposal.
+The proposal is inspired by Go discussion [#71460][discussion]. Compared to the discussed proposal, this is similar in syntax, but different in semantics.
+
+Semantically, this proposal is somewhat similar to [try-catch][try-catch] proposal, but simpler. The syntax and ergonomics are likely completely different.
 
 Key differences to #71460:
 
@@ -10,11 +12,12 @@ Key differences to #71460:
 - Instead of acting as a control statement (like if), `?` in the proposal acts more like a normal function call.
 - This proposal allows usage within a struct and chain statements.
 - Instead of allowing N return arguments, this proposal allows a maximum of two return arguments.
+- The proposal is paired with a standard library addition to make the language change useful.
 
 Key similarities to #71460:
 
 - Both proposals use the `?` character.
-- Both proposals only aim at handling error types.
+- Both proposals only aim at handling error types (not bool or other return types).
 
 Like the first versions of the [range-over-func][range-over-func] experiment, the functionality of the language proposal can be implemented and used today _without_ the new syntax. To do so, you can use the `xerrors` package, included in this repository.
 
