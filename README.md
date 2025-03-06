@@ -292,23 +292,40 @@ func AB() (_ Pipeline, _err error) {
 We defined the following functions in the `xerrors` package for our proto-type. This is proto-type code only. The final implementation will likely be handled by the compiler directly:
 
 ```go
+package xerrors
 
 type mustError struct {
 	error
 }
 
+func (err mustError) Unwrap() error {
+	return err.error
+}
+
 // Catch recovers from panics raised by Must or Must2 error handler returns
-// only. Other panics are passed through. The error from Must and Must2 are
-// written into err.
+// only. Other panics are passed through. The error from Must or Must2 is
+// passed through all handlers, if any. If the error is not set to nil by
+// any of the handlers, then target will be set with the final error value.
+// If target is nill, and the final error is not nil, Catch will panic instead.
 //
 // Likely not exposed in the final implementation. The final implementation may
 // or may not use panics for it's control flow.
-func Catch(err *error) {
+func Catch(target *error, handlers ...func(error) error) {
 	r := recover()
 	switch rt := r.(type) {
 	case nil:
 	case mustError:
-		*err = rt.error
+		nextErr := rt.error
+		for _, h := range handlers {
+			nextErr = h(nextErr)
+			if nextErr == nil {
+				return
+			}
+		}
+		if target == nil {
+			panic(nextErr)
+		}
+		*target = nextErr
 	default:
 		panic(r)
 	}
@@ -369,6 +386,20 @@ func Must2[T any](v T, err error) func(handlers ...func(error) error) T {
 	}
 }
 ```
+
+## Options
+
+### Disallow usage within non-error functions
+
+We could choose to disallow the `?` syntax inside functions that doesn't return errors. This included the `main` function.
+
+### Allow explicit catch
+
+An option could be to expose the `Catch` function from the proto-type, and allow supplying a set of error handlers that run on all errors.
+
+When an explicit Catch is added, then an implicit Catch is not added.
+
+If the Catch is called with a nil pointer, then any error that isn't fully handled (replaced by `nil`), results in a panic.
 
 ## Why not...
 
