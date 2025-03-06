@@ -4,7 +4,7 @@
 
 The proposal is inspired by Go discussion [#71460][discussion]. Compared to the discussed proposal, this is similar in syntax, but different in semantics.
 
-Semantically, this proposal is somewhat similar to [try-catch][try-catch] proposal, but simpler. The syntax and ergonomics are likely completely different.
+Semantically, this proposal is somewhat similar to [try-catch][try-catch] proposal, but simpler. The syntax and ergonomics are different.
 
 Key differences to #71460:
 
