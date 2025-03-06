@@ -7,12 +7,12 @@ import (
 
 // Wrap returns an error handler that returns:
 //
-//	fmt.Errorf(format, err, args...)
+//	fmt.Errorf(format, slices.Concat(args, []error{err})...)
 func Wrap(format string, args ...any) func(error) error {
 	return func(err error) error {
 		nextArgs := make([]any, 0, len(args)+1)
-		nextArgs = append(nextArgs, err)
 		nextArgs = append(nextArgs, args...)
+		nextArgs = append(nextArgs, err)
 		return fmt.Errorf(format, nextArgs...)
 	}
 }

@@ -77,7 +77,7 @@ New Syntax:
 ```go
 pipeline :=
 		A() ?(errors.Wrap("a: %w")).
-		B() ?(errors.Wrap("b: %[0]w (pipeline ID: %[1]s)", id))
+		B() ?(errors.Wrap("b: %[1]w (pipeline ID: %[0]s)", id))
 ```
 
 ### Collect errors
@@ -94,7 +94,7 @@ func ParseMyStruct(in transportModel) (BusinessModel, error) {
 		}
 		b, err := ParseB(in.A)
 		if err != nil {
-			 errs = append(fmt.Errorf("B: %w", err))
+			 errs = append(fmt.Errorf("b: %w", err))
 		}
 		if err := errors.Join(errs...); err != nil {
 				return BusinessModel{}, err
@@ -112,8 +112,8 @@ New Syntax:
 func ParseMyStruct(in transportModel) (BusinessModel, error) {
 		c := errors.NewCollector()
 		out := BusinessModel{
-		 		A: ParseA(in.A) ?(errors.Wrap("%a: %w"), c.Collect),
-				B: ParseB(in.B) ?(errors.Wrap("%b: %w"), c.Collect),
+		 		A: ParseA(in.A) ?(errors.Wrap("a: %w"), c.Collect),
+				B: ParseB(in.B) ?(errors.Wrap("b: %w"), c.Collect),
 		}
 
 }
@@ -165,7 +165,7 @@ func ParseMyStruct(in transportModel) (BusinessModel, error) {
 						errs = append(PathError{Path:"a", Err: err))
 	   		},
 				B: ParseB(in.B) ?(func(err error) error{
-						errs = append(PathError{Path:"a", Err: err))
+						errs = append(PathError{Path:"b", Err: err))
 	   		},
     }
     if err := errors.Join(errs...) {
@@ -229,7 +229,7 @@ The following exposed additions to the standard library `errors` package is sugg
 ```go
 // Wrap returns an error handler that returns:
 //
-// 	fmt.Errorf(format, err, args...)
+//	fmt.Errorf(format, slices.Concat(args, []error{err})...)
 func Wrap(format string, args ... any) func(error) error {
 		return func(error) error {
 				nextArgs := make([]any, 0, len(args)+1)
@@ -260,7 +260,6 @@ func (c *Collector) Err() error {
 }
 ```
 
-
 ## Implementation without a language change
 
 Following the example of range-over-func, the implementation of the `?` semantics is not magic. A tool can be written to generate go code that rewrites the `?` syntax to valid go 1.24 syntax.
@@ -271,7 +270,7 @@ func AB() (Pipeline, error) {
 		id := "test"
 		result :=
 				A() ?(errors.Wrap("a: %w")).
-				B() ?(errors.Wrap("b: %w (pipeline ID: %s)", id))
+				B() ?(errors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))
 		return result, nil
 }
 ````
@@ -285,7 +284,7 @@ func AB() (_ Pipeline, _err error) {
 		id := "test"
 		result :=
 				xerrors.Must2(A())(xerrors.Wrap("a: %w")).                       // function syntax for ?
-				xerrors.Must2(B())(xerrors.Wrap("b: %w (pipeline ID: %s)", id))  // function syntax for ?
+				xerrors.Must2(B())(xerrors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))  // function syntax for ?
 		return result, nil
 }
 ```

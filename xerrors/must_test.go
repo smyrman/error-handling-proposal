@@ -70,22 +70,22 @@ func TestMust2(t *testing.T) {
 		if v.B.b != 0 {
 			t.Errorf("b unexpectedly set to %q", v.B.b)
 		}
+	})
 
-		t.Run("fail b", func(t *testing.T) {
-			expect := "must be in range 5-100"
-			v, err := parse(transportModel{A: "good", B: 101})
-			switch {
-			case err == nil:
-				t.Error("expected error, got nil")
-			case err.Error() != expect:
-				t.Errorf("unexpected error message;\ngot:  %q\nwant: %q", err.Error(), expect)
-			}
-			if v.A.a != "" {
-				t.Errorf("a unexpectedly set to %q", v.A.a)
-			}
-			if v.B.b != 0 {
-				t.Errorf("b unexpectedly set to %q", v.B.b)
-			}
-		})
+	t.Run("fail b", func(t *testing.T) {
+		expect := "must be in range 5-100"
+		v, err := parse(transportModel{A: "good", B: 101})
+		switch {
+		case err == nil:
+			t.Error("expected error, got nil")
+		case err.Error() != expect:
+			t.Errorf("unexpected error message;\ngot:  %q\nwant: %q", err.Error(), expect)
+		}
+		if v.A.a != "" {
+			t.Errorf("a unexpectedly set to %q", v.A.a)
+		}
+		if v.B.b != 0 {
+			t.Errorf("b unexpectedly set to %q", v.B.b)
+		}
 	})
 }
