@@ -25,9 +25,8 @@ func Catch(target *error, handlers ...func(error) error) {
 		for _, h := range handlers {
 			nextErr = h(nextErr)
 			if nextErr == nil {
-				*target = nil
+				return
 			}
-			return
 		}
 		if target == nil {
 			panic(nextErr)

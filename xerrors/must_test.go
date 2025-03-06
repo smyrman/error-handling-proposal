@@ -23,11 +23,11 @@ func TestMust(t *testing.T) {
 		test := func() (_err error) {
 			defer xerrors.Catch(&_err)
 
-			xerrors.Must(checkNumber(0))
-			xerrors.Must(checkNumber(1))
-			xerrors.Must(checkNumber(2))
-			xerrors.Must(checkNumber(3))
-			xerrors.Must(checkNumber(4))
+			xerrors.Must(checkNumber(0))()
+			xerrors.Must(checkNumber(1))()
+			xerrors.Must(checkNumber(2))()
+			xerrors.Must(checkNumber(3))()
+			xerrors.Must(checkNumber(4))()
 
 			return nil
 		}
