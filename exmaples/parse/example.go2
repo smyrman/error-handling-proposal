@@ -1,0 +1,32 @@
+package main
+
+import (
+	"fmt"
+	"log/slog"
+	"os"
+
+	"errors"
+)
+
+func main() {
+	ab := ParseAB("a", 0) ?(logAndExit)
+	fmt.Println("AB:", ab)
+}
+
+func logAndExit(err error) error {
+	slog.Error(err.Error())
+	os.Exit(1)
+	return nil
+}
+
+type AB struct {
+	A A
+	B B
+}
+
+func ParseAB(a string, b int) (_ AB, _err error) {
+	return AB{
+		A: ParseA(a) ?(errors.Wrap("a: %w")),
+		B: ParseB(b) ?(errors.Wrap("b: %w")),
+	}, nil
+}

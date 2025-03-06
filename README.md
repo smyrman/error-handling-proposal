@@ -4,8 +4,6 @@
 
 The proposal is inspired by Go discussion [#71460][discussion]. Compared to the discussed proposal, this is similar in syntax, but different in semantics.
 
-Semantically, this proposal is somewhat similar to [try-catch][try-catch] proposal, but simpler. The syntax and ergonomics are different.
-
 Key differences to #71460:
 
 - Instead of the proposed syntax `?{...}`, we use syntax `?(...)`.
@@ -18,6 +16,8 @@ Key similarities to #71460:
 
 - Both proposals use the `?` character.
 - Both proposals only aim at handling error types (not bool or other return types).
+
+Semantically, this proposal is somewhat similar to [try-catch][try-catch] proposal, but simpler. The syntax and ergonomics are different.
 
 Like the first versions of the [range-over-func][range-over-func] experiment, the functionality of the language proposal can be implemented and used today _without_ the new syntax. To do so, you can use the `xerrors` package, included in this repository.
 
@@ -175,9 +175,6 @@ func ParseMyStruct(in transportModel) (BusinessModel, error) {
 }
 ```
 
-New Syntax (reusable handler):
-
-
 ## Proposal
 
 The proposal has two parts:
@@ -188,19 +185,17 @@ The proposal follows the principal of the now implemented range-over-func propos
 
 ### Language change
 
-This proposal introduce a `?` operator. The syntax of `?` is similar to that of a function call, except the parenthesis `()` are optional. That is `?` and `?()` are equivalent.
-
-The signature of the operator can be described as:
-
-```go
-func ?(handlers ...func(error) error)
-```
-
-Inside a function where the last return parameter is an error, we allow `?`  or  `?()` to come after function calls that hold one of the following signatures:
+The proposal introduce a  new `?` operator, which can be used after calls to functions that has any of the following signatures:
 
 ```go
 func f1(...) error             // One return parameter, which must be an error
 func f2[T any](...) (T, error) // Two return parameters, where the last one is an error
+```
+
+The syntax of `?` is similar to that of a function call, except the parenthesis `()` are optional. That is `?` and `?()` are equivalent. The signature of the operator can be described as:
+
+```go
+func ?(handlers ...func(error) error)
 ```
 
 When using the `?` syntax, the last return parameter of the function is passed to the `?` operator to the right, instead of to the left as normal.
@@ -221,7 +216,6 @@ If the `?` operator receives a `nil` error value, execution continues along the 
 If the `?` operator receives an error, the error is passed to each handler in order. The output from each handler becomes the input to the next, as long as the output is not `nil`. If any handler return `nil`, the handler chain is aborted, and execution continues along the "happy path."
 
 If after all handlers are called, the final return value is an error, then the flow of the current _statement_ is aborted similar to how a panic works. If `?` is used within a function where the final return statement is an error, then this panic is _recovered_ and the error value is populated with that error value and the function returns at once.
-
 ### Standard library
 
 The following exposed additions to the standard library `errors` package is suggested:
