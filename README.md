@@ -1,13 +1,41 @@
 # Error handling proposal
 
-**This is not a formal go proposal yet, but the pre-work needed in order to potentially create one.**
+**This should not be considered a formal Go proposal yet, but the pre-work needed in order to create one. When all requirements are in place, this may transition into a proposal.**
+
+Contribution guide:
+
+- Discuss changes first; either, either on the [Go issue][issue], or by raising an issue at the [GitHub repo][repo].
+- Commits should be atomic; rebase your commits to match this.
+- Examples with third-party dependencies should get it's own go.mod file.
+- Include both working Go 1.24 code (with .go suffix), and a variant using the proposed ? syntax (with .go2 suffix). -
+- Note that only files that are affected by the proposal syntax, needs a .go2 file.
+
+Contributions that may be of particular interest for now:
+
+- Contributions demonstrating how this change would help improve application code.
+- Pointing out potential issues.
+
+Links:
+
+- Pre-work repository: [smyrman/error-handling-proposal][repo]
+- Go issue: [#72149][issue]
+
+[issue]: https://github.com/golang/go/issues/72149
+[repo]: https://github.com/smyrman/error-handling-proposal
+
+Remaining content is aligned with the issue text.
+
 ### Go Programming Experience
 
-Experienced
+(Contributors may add their own replies)
+
+@smyrman: Experienced
 
 ### Other Languages Experience
 
-Python, C
+(Contributors may add their own replies)
+
+@smyrman: C++, C, Python
 
 ### Related Idea
 
@@ -38,7 +66,6 @@ Semantically, this proposal is somewhat similar to [try-catch][try-catch] propos
 [discussion]: https://github.com/golang/go/discussions/71460#discussioncomment-12365387
 [try-catch]: https://github.com/golang/go/issues/32437
 
-
 ### Does this affect error handling?
 
 Yes
@@ -53,6 +80,8 @@ It's not about generics, but the proto-type is using generics for it's implement
 
 ### Cases
 
+Before discussing the proposal, we will demonstrate a few use-cases that could benefit from it. The cases will be relatively simple. Real use-cases may be more complex, and could therefore expect to result in saving more lines.
+
 #### Return directly
 
 The direct return of an error is a commonly used case for error handling when adding additional context is not necessary.
@@ -61,15 +90,14 @@ Old syntax:
 ```go
 pipeline, err := A()
 if err != nil {
-		return err
+	return err
 }
 pipeline, err = pipeline.B()
 if err != nil {
-		return err
+	return err
 }
 ```
 New syntax:
-
 ```go
 pipeline := A()?.B()?
 ```
@@ -82,60 +110,60 @@ Old syntax:
 ```go
 pipeline, err := A()
 if err != nil {
-		return fmt.Errorf("a: %w", err)
+	return fmt.Errorf("a: %w", err)
 }
 pipeline = pipeline.B()
 if err != nil {
-		return fmt.Errorf("a: %w (pipeline ID: %s)", err, id)
+	return fmt.Errorf("a: %w (pipeline ID: %s)", err, id)
 }
 ```
 
 New Syntax:
 ```go
 pipeline :=
-		A() ?(errors.Wrap("a: %w")).
-		B() ?(errors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))
+	A() ?(errors.Wrap("a: %w")).
+	B() ?(errors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))
 ```
 
 #### Collect errors
 
-The collect errors case appear less common in Go for a few reasons. First of all, it's hard to do it as the standard mechanisms for handling it is limited. Secondly, most open source Go code is libraries. However, the use-case for collecting errors is likely common in application code. Especially code that relates to some sort of UI form-validation of user input. Another related example is an API that want to validate client input and communicate all errors at once so that the API client maintainers can more easily do their job.
+The case for collecting errors is likely not common in library code. However, it is likely useful for application code. Possible use-cases include form validation or JSON APIs.
 
 Old syntax:
 ```go
 func ParseMyStruct(in transportModel) (BusinessModel, error) {
-		var errs []error
-		a, err := ParseA(in.A)
-		if err != nil {
-				errs = append(fmt.Errorf("a: %w", err))
-		}
-		b, err := ParseB(in.A)
-		if err != nil {
-			 errs = append(fmt.Errorf("b: %w", err))
-		}
-		if err := errors.Join(errs...); err != nil {
-				return BusinessModel{}, err
-		}
+	var errs []error
+	a, err := ParseA(in.A)
+	if err != nil {
+		errs = append(fmt.Errorf("a: %w", err))
+	}
+	b, err := ParseB(in.A)
+	if err != nil {
+		errs = append(fmt.Errorf("b: %w", err))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return BusinessModel{}, err
+	}
 
-		return BusinessModel{
-		 		A: a,
-				B: b,
-		}, nil
+	return BusinessModel{
+		A: a,
+		B: b,
+	}, nil
 }
 ```
 
 New Syntax:
 ```go
 func ParseMyStruct(in transportModel) (BusinessModel, error) {
-		var c errors.Collector
-		out := BusinessModel{
-		 		A: ParseA(in.A) ?(errors.Wrap("a: %w"), c.Collect),
-				B: ParseB(in.B) ?(errors.Wrap("b: %w"), c.Collect),
-		}
-		if err := c.Err(); err != nil {
-				return BusinessModel{}, err
-		}
-		return out, nil
+	var c errors.Collector
+	out := BusinessModel{
+		A: ParseA(in.A) ?(errors.Wrap("a: %w"), c.Collect),
+		B: ParseB(in.B) ?(errors.Wrap("b: %w"), c.Collect),
+	}
+	if err := c.Err(); err != nil {
+		return BusinessModel{}, err
+	}
+	return out, nil
 }
 ```
 
@@ -156,57 +184,60 @@ func (err PathError) Error() string {
 Old syntax:
 ```go
 func ParseMyStruct(in transportModel) (BusinessModel, error) {
-		var errs []error
-		a, err := ParseA(in.A)
-		if err != nil {
-				errs = append(PathError{Path:"a", Err: err))
-		}
-		b, err := ParseB(in.A)
-		if err != nil {
-			 errs =  append(PathError{Path:"b", Err: err))
-		}
-		if err := errors.Join(errs...); err != nil {
-				return BusinessModel{}, err
-		}
+	var errs []error
+	a, err := ParseA(in.A)
+	if err != nil {
+		errs = append(PathError{Path:"a", Err: err))
+	}
+	b, err := ParseB(in.A)
+	if err != nil {
+		errs =  append(PathError{Path:"b", Err: err))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return BusinessModel{}, err
+	}
 
-		return BusinessModel{
-		 		A: a,
-				B: b,
-		}, nil
+	return BusinessModel{
+		A: a,
+		B: b,
+	}, nil
 }
 ```
 
 New Syntax (inline handler):
 ```go
 func ParseMyStruct(in transportModel) (BusinessModel, error) {
-		var errs []error
-		out := BusinessModel{
-				A: ParseA(in.A) ?(func(err error) error{
-						errs = append(PathError{Path:"a", Err: err))
-	   		},
-				B: ParseB(in.B) ?(func(err error) error{
-						errs = append(PathError{Path:"b", Err: err))
-	   		},
+	var errs []error
+	out := BusinessModel{
+		A: ParseA(in.A) ?(func(err error) error{
+			errs = append(PathError{Path:"a", Err: err))
+		}),
+		B: ParseB(in.B) ?(func(err error) error{
+			errs = append(PathError{Path:"b", Err: err))
+		}),
     }
     if err := errors.Join(errs...) {
-    		return BusinessModel{}, err
-    }
-    return out, nil
-}
-```
+     		return BusinessModel{}, err
+     }
+     return out, nil
+ }
+ ```
 
 ### Proposal
 
-**This is not a complete proposal yet. Instead, it's in an investigative phase, and I am creating this issue to identify the next steps.**
-
-Pre-work and initial design can be found here:
-- https://github.com/smyrman/error-handling-proposal
-
 The proposal has two parts:
-- An addition to the Go syntax.
+- An addition to the Go syntax, using `?()` /`?` to catch errors.
 - Helper functions in the `errors` package.
 
 The proposal follows the principal of the now implemented range-over-func proposal in making sure that the solution can be described as valid Go code using the current language syntax. As of the time of writing, this is the syntax of Go 1.24.
+
+The `?`/`?()` syntax can be used to _move handling_ of errors from the left of the expression to the right. The default handler (no parenthesis), is to return on error. When parenthesis are provided, errors pass though handlers of format `func(error) error`. If any handler return nill, the code continuous along the happy path. If the final handler returns an error, the function with the `?` syntax returns.
+
+It's not yet clear if the `?` syntax should be allowed inside functions that does _not_ return an error. If it's allowed, the suggestion is that the `?` syntax would result in a panic. See options for more details.
+
+The standard library changes involve adding handlers for the most common cases for error handling.
+
+### Standard library changes
 
 The following exposed additions to the standard library `errors` package is suggested:
 
@@ -282,11 +313,12 @@ If the `?` operator receives an error, the error is passed to each handler in or
 
 If after all handlers are called, the final return value is an error, then the flow of the current _statement_ is aborted similar to how a panic works. If `?` is used within a function where the final return statement is an error, then this panic is _recovered_ and the error value is populated with that error value and the function returns at once.
 
+
 ### Is this change backward compatible?
 
 Yes
 
-This work leans on the work done for [%71460][https://github.com/golang/go/discussions/71460], that highlights that the `?` operator is invalid to use in any existing code. Thus it's expected that no existing code will be able to break due to the introduction of the new syntax.
+This work leans on the work done for [%71460][discussion], that highlights that the `?` operator is invalid to use in any existing code. Thus it's expected that no existing code will be able to break due to the introduction of the new syntax.
 
 ### Orthogonality: How does this change interact or overlap with existing features?
 
@@ -294,11 +326,11 @@ _No response_
 
 ### Would this change make Go easier or harder to learn, and why?
 
-Any addition to the Go syntax, including this one, will make it harder to learn go, including this one.
+Any addition to the Go syntax, including this one, will make it harder to learn Go. However, people coming from an exception handling paradigm may find the new syntax less intrusive then the explicit return.
 
 ### Cost Description
 
-The highest cost of this proposal is that there will now be multiple patterns for handling errors.
+The highest cost of this proposal is likely that there will now be multiple patterns for handling errors. There could be discrepancies and disagreement between different projects about which style to use.
 
 ### Changes to Go ToolChain
 
@@ -310,21 +342,18 @@ _No response_
 
 ### Prototype
 
-https://github.com/smyrman/error-handling-proposal includes a working proto-type for the program _flow_ that the new syntax suggests. However there is no transpiler for converting the proposed syntax into valid Go code. In theory one could be written, but I do not have the required time or skills to do so.
+The proto-type code is found in the [pre-work repo][repo].
 
-
-## Implementation without a language change
-
-Following the example of range-over-func, the implementation of the `?` semantics is not magic. A tool can be written to generate go code that rewrites the `?` syntax to valid go 1.24 syntax.
+Following the example of range-over-func, the implementation of the `?` semantics is not magic. A tool could be written to generate go code that rewrites the `?` syntax to valid go 1.24 syntax.
 
 With proposed syntax:
 ```go
 func AB() (Pipeline, error) {
-		id := "test"
-		result :=
-				A() ?(errors.Wrap("a: %w")).
-				B() ?(errors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))
-		return result, nil
+	id := "test"
+	result :=
+		A() ?(errors.Wrap("a: %w")).
+		B() ?(errors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))
+	return result, nil
 }
 ````
 
@@ -332,13 +361,13 @@ Can be written using the proto-type library as:
 
 ```go
 func AB() (_ Pipeline, _err error) {
-		defer	errors.Catch(&_err) // Added to the top of all function bodies that contain a `?` operator.
+	defer	errors.Catch(&_err) // Added to the top of all function bodies that contain a `?` operator.
 
-		id := "test"
-		result :=
-				xerrors.Must2(A())(xerrors.Wrap("a: %w")).                       // function syntax for ?
-				xerrors.Must2(B())(xerrors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))  // function syntax for ?
-		return result, nil
+	id := "test"
+	result :=
+		xerrors.Must2(A())(xerrors.Wrap("a: %w")).                             // function syntax for ?
+		xerrors.Must2(B())(xerrors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))  // function syntax for ?
+	return result, nil
 }
 ```
 
@@ -440,13 +469,17 @@ func Must2[T any](v T, err error) func(handlers ...func(error) error) T {
 }
 ```
 
-## Options
+### Options
 
-### Disallow usage within non-error functions
+Options could be applied to change the proposal in various ways.
+
+#### 1: Disallow usage within non-error functions
 
 We could choose to disallow the `?` syntax inside functions that doesn't return errors. This included the `main` function.
 
-### Allow explicit catch
+This would ensure that the `?` syntax _can not_ lead to panics.
+
+#### 2: Allow explicit catch
 
 An option could be to expose the `Catch` function from the proto-type, and allow supplying a set of error handlers that run on all errors.
 
@@ -454,9 +487,15 @@ When an explicit Catch is added, then an implicit Catch is not added.
 
 If the Catch is called with a nil pointer, then any error that isn't fully handled (replaced by `nil`), results in a panic.
 
-## Why not...
+#### 3: Chain via ? syntax
 
-### Why not allow more than two return values?
+Use syntax `? handler1 ? handler2` as shown in [this comment][comment-by-733amir] by @733amir.
+
+[comment-by-733amir]: https://github.com/golang/go/discussions/71460#discussioncomment-12418576
+
+### Why not...
+
+#### Why not allow more than two return values?
 
 ```go
 a, b, err := A()
@@ -471,7 +510,7 @@ Most functions that return an error, return either a single parameter, or two pa
 
 Allowing for more return values risks complicating the implementation, and is likely offer little value in return.
 
-### Why require the final return parameter to be an error?
+#### Why require the final return parameter to be an error?
 
 ```go
 a := os.Getenv("VARIABLE")? // not allowed
