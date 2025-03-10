@@ -1,6 +1,22 @@
 # Error handling proposal
 
 **This is not a formal go proposal yet, but the pre-work needed in order to potentially create one.**
+### Go Programming Experience
+
+Experienced
+
+### Other Languages Experience
+
+Python, C
+
+### Related Idea
+
+- [x] Has this idea, or one like it, been proposed before?
+- [x] Does this affect error handling?
+- [x] Is this about generics?
+- [x] Is this change backward compatible? Breaking the Go 1 compatibility guarantee is a large cost and requires a large benefit
+
+### Has this idea, or one like it, been proposed before?
 
 The proposal is inspired by Go discussion [#71460][discussion]. Compared to the discussed proposal, this is similar in syntax, but different in semantics.
 
@@ -19,24 +35,25 @@ Key similarities to #71460:
 
 Semantically, this proposal is somewhat similar to [try-catch][try-catch] proposal, but simpler. The syntax and ergonomics are different.
 
-Like the first versions of the [range-over-func][range-over-func] experiment, the functionality of the language proposal can be implemented and used today _without_ the new syntax. To do so, you can use the `xerrors` package, included in this repository.
-
-Before we get to the proposal itself, we will go through some use-cases. For more use-cases and examples, please see the examples folder. It's a little scarce at the moment. If you have a good example that you think should be included, please read the contribution guide.
-
 [discussion]: https://github.com/golang/go/discussions/71460#discussioncomment-12365387
-[range-over-func]: https://go.dev/wiki/RangefuncExperiment
 [try-catch]: https://github.com/golang/go/issues/32437
 
-# Contribution guide
 
-1. Discuss changes first; e.g. by raising an issue.
-2. Commits should be atomic; rebase your commits to match this.
-3. Examples with third-party dependencies should get it's own `go.mod` file.
-4. Include both working Go 1.24 code (with .go suffix), and a variant using the proposed `?` syntax (with .go2 suffix). Note that only files that are affected by the proposal syntax, needs a .go2 file.
+### Does this affect error handling?
 
-## Cases
+Yes
 
-### Return directly
+This proposal includes:
+1. An addition to the `errors` standard library package.
+2. A new syntax for handling errors.
+
+### Is this about generics?
+
+It's not about generics, but the proto-type is using generics for it's implementation.
+
+### Cases
+
+#### Return directly
 
 The direct return of an error is a commonly used case for error handling when adding additional context is not necessary.
 
@@ -57,7 +74,7 @@ New syntax:
 pipeline := A()?.B()?
 ```
 
-### Return wrapped error
+#### Return wrapped error
 
 To wrap an error before return is a commonly used case for error handling when adding additional context is useful.
 
@@ -77,10 +94,10 @@ New Syntax:
 ```go
 pipeline :=
 		A() ?(errors.Wrap("a: %w")).
-		B() ?(errors.Wrap("b: %[1]w (pipeline ID: %[0]s)", id))
+		B() ?(errors.Wrap("b: %[2]w (pipeline ID: %[1]s)", id))
 ```
 
-### Collect errors
+#### Collect errors
 
 The collect errors case appear less common in Go for a few reasons. First of all, it's hard to do it as the standard mechanisms for handling it is limited. Secondly, most open source Go code is libraries. However, the use-case for collecting errors is likely common in application code. Especially code that relates to some sort of UI form-validation of user input. Another related example is an API that want to validate client input and communicate all errors at once so that the API client maintainers can more easily do their job.
 
@@ -110,16 +127,19 @@ func ParseMyStruct(in transportModel) (BusinessModel, error) {
 New Syntax:
 ```go
 func ParseMyStruct(in transportModel) (BusinessModel, error) {
-		c := errors.NewCollector()
+		var c errors.Collector
 		out := BusinessModel{
 		 		A: ParseA(in.A) ?(errors.Wrap("a: %w"), c.Collect),
 				B: ParseB(in.B) ?(errors.Wrap("b: %w"), c.Collect),
 		}
-
+		if err := c.Err(); err != nil {
+				return BusinessModel{}, err
+		}
+		return out, nil
 }
 ```
 
-### Custom error wrapping
+#### Custom error wrapping
 
 Custom error type:
 ```go
@@ -175,7 +195,12 @@ func ParseMyStruct(in transportModel) (BusinessModel, error) {
 }
 ```
 
-## Proposal
+### Proposal
+
+**This is not a complete proposal yet. Instead, it's in an investigative phase, and I am creating this issue to identify the next steps.**
+
+Pre-work and initial design can be found here:
+- https://github.com/smyrman/error-handling-proposal
 
 The proposal has two parts:
 - An addition to the Go syntax.
@@ -183,7 +208,47 @@ The proposal has two parts:
 
 The proposal follows the principal of the now implemented range-over-func proposal in making sure that the solution can be described as valid Go code using the current language syntax. As of the time of writing, this is the syntax of Go 1.24.
 
-### Language change
+The following exposed additions to the standard library `errors` package is suggested:
+
+```go
+// Wrap returns an error handler that returns:
+//
+//	fmt.Errorf(format, slices.Concat(args, []error{err})...)
+func Wrap(format string, args ... any) func(error) error {
+	return func(error) error {
+		nextArgs := make([]any, 0, len(args)+1)
+		nextArgs = append(nextArgs, args...)
+		nextArgs = append(nextArgs, err)
+		return fmt.Errorf(format, nextArgs...)
+	}
+}
+
+ // Collector expose an error handler function [Collect] for collecting
+ // errors into a slice. After the collection is complete, A joined error
+ // can be retrieved from [Err].
+type Collector struct {
+	errs []error
+}
+
+// Collect is an error handler that appends err to c.
+func (c *Collector) Collect(err error) error {
+	if err != nil {
+		c.errs = append(c.errs, err)
+	}
+	return nil
+}
+
+// Err returns an joined
+func (c *Collector) Err() error {
+	return Join(c.errs...)
+}
+```
+
+### Language Spec Changes
+
+_No response_
+
+### Informal Change
 
 The proposal introduce a  new `?` operator, which can be used after calls to functions that has any of the following signatures:
 
@@ -216,43 +281,37 @@ If the `?` operator receives a `nil` error value, execution continues along the 
 If the `?` operator receives an error, the error is passed to each handler in order. The output from each handler becomes the input to the next, as long as the output is not `nil`. If any handler return `nil`, the handler chain is aborted, and execution continues along the "happy path."
 
 If after all handlers are called, the final return value is an error, then the flow of the current _statement_ is aborted similar to how a panic works. If `?` is used within a function where the final return statement is an error, then this panic is _recovered_ and the error value is populated with that error value and the function returns at once.
-### Standard library
 
-The following exposed additions to the standard library `errors` package is suggested:
+### Is this change backward compatible?
 
-```go
-// Wrap returns an error handler that returns:
-//
-//	fmt.Errorf(format, slices.Concat(args, []error{err})...)
-func Wrap(format string, args ... any) func(error) error {
-		return func(error) error {
-				nextArgs := make([]any, 0, len(args)+1)
-				nextArgs = append(nextArgs, err)
-				nextArgs = append(nextArgs, args...)
-				return fmt.Errorf(format, nextArgs...)
-		}
-}
+Yes
 
- // Collector expose an error handler function [Collect] for collecting
- // errors into a slice. After the collection is complete, A joined error
- // can be retrieved from [Err].
-type Collector struct {
-		errs []error
-}
+This work leans on the work done for [%71460][https://github.com/golang/go/discussions/71460], that highlights that the `?` operator is invalid to use in any existing code. Thus it's expected that no existing code will be able to break due to the introduction of the new syntax.
 
-// Collect is an error handler that appends err to c.
-func (c *Collector) Collect(err error) error {
-		if err != nil {
-				c.errs = append(c.errs, err)
-		}
-		return nil
-}
+### Orthogonality: How does this change interact or overlap with existing features?
 
-// Err returns an joined
-func (c *Collector) Err() error {
-		return Join(c.errs...)
-}
-```
+_No response_
+
+### Would this change make Go easier or harder to learn, and why?
+
+Any addition to the Go syntax, including this one, will make it harder to learn go, including this one.
+
+### Cost Description
+
+The highest cost of this proposal is that there will now be multiple patterns for handling errors.
+
+### Changes to Go ToolChain
+
+vet, gopls, gofmt
+
+### Performance Costs
+
+_No response_
+
+### Prototype
+
+https://github.com/smyrman/error-handling-proposal includes a working proto-type for the program _flow_ that the new syntax suggests. However there is no transpiler for converting the proposed syntax into valid Go code. In theory one could be written, but I do not have the required time or skills to do so.
+
 
 ## Implementation without a language change
 
